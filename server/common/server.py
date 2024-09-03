@@ -1,6 +1,6 @@
 import socket
 import logging
-
+import signal
 
 class Server:
     def __init__(self, port, listen_backlog):
@@ -8,7 +8,7 @@ class Server:
         self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._server_socket.bind(('', port))
         self._server_socket.listen(listen_backlog)
-
+        self._signal_received = False
     def run(self):
         """
         Dummy Server loop
@@ -18,10 +18,20 @@ class Server:
         finishes, servers starts to accept new connections again
         """
 
+        def __sigterm_handler(__signo, __stack_frame):
+            logging.info(f'action: receive_signal {signal.Signals(__signo).name} | result: success')
+            self._server_socket.close()
+            self._signal_received = True
+            return
+        
+        signal.signal(signal.SIGTERM, __sigterm_handler)
+
         # TODO: Modify this program to handle signal to graceful shutdown
         # the server
-        while True:
+        while not self._signal_received:
             client_sock = self.__accept_new_connection()
+            if client_sock is None:
+                return
             self.__handle_client_connection(client_sock)
 
     def __handle_client_connection(self, client_sock):
@@ -53,6 +63,9 @@ class Server:
 
         # Connection arrived
         logging.info('action: accept_connections | result: in_progress')
-        c, addr = self._server_socket.accept()
+        try:
+            c, addr = self._server_socket.accept()
+        except:
+            return None
         logging.info(f'action: accept_connections | result: success | ip: {addr[0]}')
         return c

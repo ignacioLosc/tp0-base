@@ -1,0 +1,1 @@
+docker exec netcat ./validate.sh && docker stop netcat

@@ -18,7 +18,7 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(7500, b.number)
 
     def test_has_won_with_winner_number_must_be_true(self):
-        b = bet('1', 'first', 'last', 10000000,'2000-12-20', LOTTERY_WINNER_NUMBER)
+        b = Bet('1', 'first', 'last', 10000000,'2000-12-20', LOTTERY_WINNER_NUMBER)
         self.assertTrue(has_won(b))
 
     def test_has_won_with_winner_number_must_be_true(self):

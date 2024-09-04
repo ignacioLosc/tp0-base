@@ -1,0 +1,16 @@
+# id: 1
+server:
+  address: "server:12345"
+loop:
+  amount: 8
+  period: "5s"
+log:
+  level: "INFO"
+batch:
+  maxAmount: 10
+client:
+  NOMBRE: "Agustin Emanuel"
+  APELLIDO: "Zambrano"
+  DOCUMENTO: "21689196"
+  NACIMIENTO: "2000-05-10"
+  NUMERO: "9325"

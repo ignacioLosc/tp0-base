@@ -1,0 +1,16 @@
+# id: 1
+server:
+  address: "server:12345"
+loop:
+  amount: 8
+  period: "5s"
+log:
+  level: "INFO"
+batch:
+  maxAmount: 10
+client:
+  NOMBRE: "Tiago Nicolás"
+  APELLIDO: "Rivera"
+  DOCUMENTO: "34407251"
+  NACIMIENTO: "2001-08-29"
+  NUMERO: "1033"

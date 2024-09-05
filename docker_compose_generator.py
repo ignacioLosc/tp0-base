@@ -14,18 +14,18 @@ def generateServer(f):
     f.write("    networks:\n")
     f.write("      - testing_net\n\n")
 
-# def generateEchoService(f):
-#     f.write("  netcat:\n")
-#     f.write("    container_name: netcat" + str(id) + "\n")
-#     f.write("    build:\n")
-#     f.write("      context: ./netcat\n")
-#     f.write("      dockerfile: Dockerfile\n")
-#     f.write("    stdin_open: true\n")
-#     f.write("    tty: true\n")
-#     f.write("    networks:\n")
-#     f.write("      - testing_net\n")
-#     f.write("    depends_on:\n")
-#     f.write("      - server\n\n")
+def generateEchoService(f):
+    f.write("  netcat:\n")
+    f.write("    container_name: netcat\n")
+    f.write("    build:\n")
+    f.write("      context: ./netcat\n")
+    f.write("      dockerfile: Dockerfile\n")
+    f.write("    stdin_open: true\n")
+    f.write("    tty: true\n")
+    f.write("    networks:\n")
+    f.write("      - testing_net\n")
+    f.write("    depends_on:\n")
+    f.write("      - server\n\n")
 
 def generateClient(f, id):
     f.write("  client" + str(id) + ":\n")

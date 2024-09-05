@@ -30,7 +30,6 @@ class Protocol:
         """
         msg_bytes = bytes(msg, encoding='utf8') + self._message_delimiter
         bytes_sent = client_sock.send(msg_bytes)
-        # logging.info(f'bytes_sent: {bytes_sent}, len(msg_bytes): {len(msg_bytes)}')
         while bytes_sent != len(msg_bytes):
             bytes_sent += client_sock.send(msg_bytes[:bytes_sent])
 
@@ -46,9 +45,6 @@ class Protocol:
             data = client_sock.recv(1024)
         msg.append(data)
         addr = client_sock.getpeername()
-        # msg_without_delimiter = msg[:len(self._message_delimiter)]
-        # logging.info(f'action: receive_message | result: success | ip: {addr[0]} | msg: {msg_without_delimiter}')
-        # return b"".join((msg_without_delimiter)).rstrip().decode('utf-8')
         return b"".join((msg)).rstrip().decode('utf-8')
 
 class Server:
@@ -60,7 +56,7 @@ class Server:
         self._signal_received = False
         self._protocol = Protocol(field_delimiter='|', message_delimiter=b'\n')
         self._threads: list[threading.Thread] = []
-        self._barrier = threading.Barrier(NUMBER_OF_AGENCIES, timeout=5) # NUMBER_OF_AGENCIES
+        self._barrier = threading.Barrier(NUMBER_OF_AGENCIES, timeout=5)
         self._lock = threading.Lock()
 
     def run(self):
@@ -114,13 +110,10 @@ class Server:
         """
         Handle every possible client message
         """
-        # logging.info(f'msg: {msg}')
         msg_parts = msg.split(BET_DELIMITER)
-        # logging.info(f'msg_parts: {msg_parts}')
         
         betting_ended = False
         for msg in msg_parts:
-            # logging.info(f'msg: {msg}')
             if msg.split(FIELD_DELIMITER)[0] == Action.APUESTA and not betting_ended:
                 amount_of_bets[0] += 1
                 msg_fields = msg.split(FIELD_DELIMITER)
@@ -128,18 +121,13 @@ class Server:
             elif msg.split(FIELD_DELIMITER)[0] == Action.FIN_APUESTA:
                 betting_ended = True
                 logging.info(f'action: apuesta_recibida | result: success | cantidad: ${amount_of_bets[0]}')
-                #if amount_of_bets > 0:
                 self._protocol.send_message(client_sock, f'{Action.CONFIRMAR_APUESTA}|{amount_of_bets[0]}')
                 amount_of_bets[0] = 0
             elif msg.split(FIELD_DELIMITER)[0] == Action.GANADORES:
-                # Hacer sorteo y devolver ganadores
-                # Modificar para cambiar barrera y solo si
-                # terminaron las 5 hacer el sorteo
                 try:
                     remaining = self._barrier.wait()
                     if remaining == 0:
                         logging.info(f'action: sorteo | result: success')
-                    #logging.info(f'GANADORES {msg}')
                     winners_documents = self.__get_winners(msg.split(FIELD_DELIMITER)[1])
                     self._protocol.send_message(client_sock, f'{Action.GANADORES}|{FIELD_DELIMITER.join(winners_documents)}')
                 except:
@@ -159,9 +147,7 @@ class Server:
         amount_of_bets = [0]
         while True:
             try:
-                # logging.info(f'Receiving messages')
                 msgs = self._protocol.receive_messages(client_sock)
-                # logging.info(f'Messages {msgs.split(MESSAGE_DELIMITER_STR)}')
                 for msg in msgs.split(MESSAGE_DELIMITER_STR):
                     self.__handle_client_message(client_sock, msg, amount_of_bets)
             except OSError as e:

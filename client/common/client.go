@@ -64,9 +64,6 @@ func NewProtocol(fieldDelimiter string, messageDelimiter byte) *Protocol {
 }
 
 func (p *Protocol) writeMessage(w io.Writer, message string) error {
-	// log.Infof("sending message: %v",
-	// 	message,
-	// )
 	messageLength := len(message)
 	bytesWritten, err := fmt.Fprint(w, message)
 	for bytesWritten < messageLength {
@@ -220,9 +217,6 @@ func (c *Client) getBets(fileScanner *bufio.Scanner, currPacketSize *int) ([]Bet
 				break
 			}
 			betFields := strings.Split(betCsv, ",")
-			// log.Infof("BET FIELDS: %v",
-			// 	betFields,
-			// )
 			bets = append(bets, Bet{c.config.ID, betFields[0], betFields[1], betFields[2], betFields[3], betFields[4]})
 		}
 	}
@@ -257,12 +251,10 @@ func (c *Client) makeBets(agency_files []*zip.File) {
 			currPacketSize = 0
 			if lastBet {
 				message := formattedBets + BET_DELIMITER + FIN_APUESTA + BET_DELIMITER + GANADORES + FIELD_DELIMITER + c.config.ID
-				//log.Infof("LAST BET SENDING AND RECEIVING")
 				c.sendAndReceiveMessage(fmt.Sprintf("%v%c", message, MESSAGE_DELIMITER))
 				c.waitForWinners()
 				break
 			} else {
-				// c.sendMessage(fmt.Sprintf("%v%c", formattedBets, MESSAGE_DELIMITER))
 				c.sendAndReceiveMessage(fmt.Sprintf("%v%c", formattedBets+BET_DELIMITER+FIN_APUESTA, MESSAGE_DELIMITER))
 			}
 		}

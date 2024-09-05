@@ -14,7 +14,7 @@ services:
   netcat:
     container_name: netcat
     build: 
-      context: ${PWD}/netcat
+      context: ./netcat
       dockerfile: Dockerfile
     stdin_open: true
     tty: true

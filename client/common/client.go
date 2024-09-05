@@ -64,6 +64,9 @@ func NewProtocol(fieldDelimiter string, messageDelimiter byte) *Protocol {
 }
 
 func (p *Protocol) writeMessage(w io.Writer, message string) error {
+	// log.Infof("sending message: %v",
+	// 	message,
+	// )
 	messageLength := len(message)
 	bytesWritten, err := fmt.Fprint(w, message)
 	for bytesWritten < messageLength {
@@ -102,6 +105,9 @@ func (p *Protocol) receiveMessage(conn net.Conn) (string, error) {
 
 func (p *Protocol) formatBets(bets []Bet) (string, error) {
 	formattedBets := ""
+	if len(bets) == 0 {
+		return formattedBets, nil
+	}
 	for idx, bet := range bets {
 		formattedBets += APUESTA + FIELD_DELIMITER + bet.agency + FIELD_DELIMITER + bet.firstName + FIELD_DELIMITER + bet.lastName + FIELD_DELIMITER + bet.document + FIELD_DELIMITER + bet.birthdate + FIELD_DELIMITER + bet.number
 		if idx != len(bets)-1 {
@@ -142,15 +148,11 @@ func (c *Client) createClientSocket() error {
 	return nil
 }
 
-func (c *Client) sendMessage(msg string) {
-	// Create the connection the server in every loop iteration. Send an
-	c.createClientSocket()
-
+func (c *Client) sendAndReceiveMessage(msg string) {
 	c.config.Protocol.writeMessage(c.conn, msg)
 
 	msg, err := c.config.Protocol.receiveMessage(c.conn)
 	msgParts := strings.Split(msg, FIELD_DELIMITER)
-	c.conn.Close()
 
 	if err != nil {
 		log.Errorf("action: apuesta_enviada | result: fail | error: %v",
@@ -158,16 +160,45 @@ func (c *Client) sendMessage(msg string) {
 		)
 		return
 	}
-
 	if msgParts[0] == GANADORES {
+		cantGanadores := 0
+		if len(msgParts[1]) > 0 {
+			cantGanadores = len(strings.Split(msgParts[1], FIELD_DELIMITER))
+		}
 		log.Infof("action: consulta_ganadores | result: success | cant_ganadores: %v",
-			msgParts[1],
+			cantGanadores,
 		)
 
 	} else {
 		log.Infof("action: apuesta_enviada | result: success | cantidad: %v",
 			msgParts[1],
 		)
+	}
+}
+
+func (c *Client) waitForWinners() {
+	receivedResult := false
+	for !receivedResult {
+		msg, err := c.config.Protocol.receiveMessage(c.conn)
+		msgParts := strings.Split(msg, FIELD_DELIMITER)
+
+		if err != nil {
+			log.Errorf("action: consulta_ganadores | result: fail | error: %v",
+				err,
+			)
+			return
+		}
+		if msgParts[0] == GANADORES {
+			receivedResult = true
+			cantGanadores := 0
+			if len(msgParts[1]) > 0 {
+				cantGanadores = len(strings.Split(msgParts[1], FIELD_DELIMITER))
+			}
+			log.Infof("action: consulta_ganadores | result: success | cant_ganadores: %v",
+				cantGanadores,
+			)
+
+		}
 	}
 }
 
@@ -225,10 +256,14 @@ func (c *Client) makeBets(agency_files []*zip.File) {
 			}
 			currPacketSize = 0
 			if lastBet {
-				c.sendMessage(fmt.Sprintf("%v%c", formattedBets, MESSAGE_DELIMITER))
+				message := formattedBets + BET_DELIMITER + FIN_APUESTA + BET_DELIMITER + GANADORES + FIELD_DELIMITER + c.config.ID
+				//log.Infof("LAST BET SENDING AND RECEIVING")
+				c.sendAndReceiveMessage(fmt.Sprintf("%v%c", message, MESSAGE_DELIMITER))
+				c.waitForWinners()
+				break
 			} else {
-				message := formattedBets + ";" + FIN_APUESTA + ";" + GANADORES
-				c.sendMessage(fmt.Sprintf("%v%c", message, MESSAGE_DELIMITER))
+				// c.sendMessage(fmt.Sprintf("%v%c", formattedBets, MESSAGE_DELIMITER))
+				c.sendAndReceiveMessage(fmt.Sprintf("%v%c", formattedBets+BET_DELIMITER+FIN_APUESTA, MESSAGE_DELIMITER))
 			}
 		}
 		file.Close()
@@ -245,11 +280,6 @@ func (c *Client) getAllAgencyFiles(dataset *zip.ReadCloser) []*zip.File {
 	return agency_files
 }
 
-func (c *Client) getWinners() {
-	message := GANADORES
-	c.sendMessage(fmt.Sprintf("%v%c", message, MESSAGE_DELIMITER))
-}
-
 // StartClientLoop Send messages to the client until some time threshold is met
 func (c *Client) StartClientLoop() {
 	signalChannel := make(chan os.Signal, 1)
@@ -263,9 +293,8 @@ func (c *Client) StartClientLoop() {
 	agency_files := c.getAllAgencyFiles(dataset)
 	if len(agency_files) != 0 {
 		log.Infof("agency_files_last_name: %v", agency_files[len(agency_files)-1].Name)
+		c.createClientSocket()
 		c.makeBets(agency_files)
-		// OBTENER GANADORES
-		c.getWinners()
 	}
 
 	signalRecv := <-signalChannel

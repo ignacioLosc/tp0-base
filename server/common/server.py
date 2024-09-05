@@ -3,11 +3,14 @@ import logging
 import signal
 
 from enum import Enum
+import threading
 from common.utils import Bet, has_won, load_bets, store_bets
 
 MESSAGE_DELIMITER = b'\n'
+MESSAGE_DELIMITER_STR = '\n'
 FIELD_DELIMITER = '|'
 BET_DELIMITER = ';'
+NUMBER_OF_AGENCIES = 5
 
 class Action(str, Enum):
     APUESTA = 'APUESTA'
@@ -31,7 +34,7 @@ class Protocol:
         while bytes_sent != len(msg_bytes):
             bytes_sent += client_sock.send(msg_bytes[:bytes_sent])
 
-    def receive_message(self, client_sock):
+    def receive_messages(self, client_sock):
         """
         Receives message from socket.
         Avoids short read error
@@ -43,9 +46,10 @@ class Protocol:
             data = client_sock.recv(1024)
         msg.append(data)
         addr = client_sock.getpeername()
-        msg_without_delimiter = msg[:len(self._message_delimiter)]
+        # msg_without_delimiter = msg[:len(self._message_delimiter)]
         # logging.info(f'action: receive_message | result: success | ip: {addr[0]} | msg: {msg_without_delimiter}')
-        return b"".join((msg_without_delimiter)).rstrip().decode('utf-8')
+        # return b"".join((msg_without_delimiter)).rstrip().decode('utf-8')
+        return b"".join((msg)).rstrip().decode('utf-8')
 
 class Server:
     def __init__(self, port, listen_backlog):
@@ -55,6 +59,9 @@ class Server:
         self._server_socket.listen(listen_backlog)
         self._signal_received = False
         self._protocol = Protocol(field_delimiter='|', message_delimiter=b'\n')
+        self._threads: list[threading.Thread] = []
+        self._barrier = threading.Barrier(NUMBER_OF_AGENCIES, timeout=5) # NUMBER_OF_AGENCIES
+        self._lock = threading.Lock()
 
     def run(self):
         """
@@ -73,64 +80,72 @@ class Server:
             logging.info(f'action: receive_signal {signal.Signals(__signo).name} | result: success')
             self._server_socket.close()
             self._signal_received = True
+            self._barrier.abort()
+            for t in self._threads:
+                t.join()
             return
         
         signal.signal(signal.SIGTERM, __sigterm_handler)
 
-        # TODO: Modify this program to handle signal to graceful shutdown
-        # the server
         while not self._signal_received:
-            client_sock = self.__accept_new_connection()
-            if client_sock is None:
-                return
-            self.__handle_client_connection(client_sock)
+            self.__accept_new_connection()
+            
 
     def __save_client_bets(self, bets: list[Bet]):
         for bet in bets:
             logging.info(f'action: apuesta_almacenada | result: success | dni: {bet.document} | numero: {bet.number}')
-        store_bets(bets)
+        with self._lock:
+            store_bets(bets)
     
     def __handle_client_bet(self, client_sock, bet_parts: list[str]):
         bet = Bet(bet_parts[0], bet_parts[1], bet_parts[2], bet_parts[3], bet_parts[4], bet_parts[5])
         self.__save_client_bets([bet])
     
-    def __get_winners(self):
-        amount_of_winners = 0
-        list_of_bets = load_bets()
-        for bet in list_of_bets:
-            if has_won(bet):
-                amount_of_winners += 1
-        return amount_of_winners
+    def __get_winners(self, agency):
+        winners_documents = []
+        with self._lock:
+            list_of_bets = load_bets()
+            for bet in list_of_bets:
+                if bet.agency == int(agency) and has_won(bet):
+                    winners_documents.append(bet.document)
+        return winners_documents
     
-    def __handle_client_message(self, client_sock, msg):
+    def __handle_client_message(self, client_sock, msg, amount_of_bets):
         """
         Handle every possible client message
         """
-        # INPROGESS: Add support for batch messages
+        # logging.info(f'msg: {msg}')
         msg_parts = msg.split(BET_DELIMITER)
         # logging.info(f'msg_parts: {msg_parts}')
-        amount_of_bets = 0
+        
         betting_ended = False
         for msg in msg_parts:
             # logging.info(f'msg: {msg}')
             if msg.split(FIELD_DELIMITER)[0] == Action.APUESTA and not betting_ended:
-                amount_of_bets += 1
+                amount_of_bets[0] += 1
                 msg_fields = msg.split(FIELD_DELIMITER)
                 self.__handle_client_bet(client_sock, msg_fields[1:])
             elif msg.split(FIELD_DELIMITER)[0] == Action.FIN_APUESTA:
                 betting_ended = True
-                logging.info(f'action: apuesta_recibida | result: success | cantidad: ${amount_of_bets}')
-                if amount_of_bets > 0:
-                    self._protocol.send_message(client_sock, f'{Action.CONFIRMAR_APUESTA}|{amount_of_bets}')
+                logging.info(f'action: apuesta_recibida | result: success | cantidad: ${amount_of_bets[0]}')
+                #if amount_of_bets > 0:
+                self._protocol.send_message(client_sock, f'{Action.CONFIRMAR_APUESTA}|{amount_of_bets[0]}')
+                amount_of_bets[0] = 0
             elif msg.split(FIELD_DELIMITER)[0] == Action.GANADORES:
                 # Hacer sorteo y devolver ganadores
                 # Modificar para cambiar barrera y solo si
                 # terminaron las 5 hacer el sorteo
-                logging.info(f'action: sorteo | result: success')
-                amount_of_winners = self.__get_winners()
-                self._protocol.send_message(client_sock, f'{Action.GANADORES}|{amount_of_winners}')
+                try:
+                    remaining = self._barrier.wait()
+                    if remaining == 0:
+                        logging.info(f'action: sorteo | result: success')
+                    #logging.info(f'GANADORES {msg}')
+                    winners_documents = self.__get_winners(msg.split(FIELD_DELIMITER)[1])
+                    self._protocol.send_message(client_sock, f'{Action.GANADORES}|{FIELD_DELIMITER.join(winners_documents)}')
+                except:
+                    return
             else:
-                logging.info(f'msg outside if: {msg}, {msg.split(FIELD_DELIMITER)[0]}')
+                logging.info(f'UNHANDLED MESSAGE: {msg}, {msg.split(FIELD_DELIMITER)[0]}')
         
         
 
@@ -141,16 +156,18 @@ class Server:
         If a problem arises in the communication with the client, the
         client socket will also be closed
         """
-        try:
-            # DONE: Modify the receive to avoid short-reads
-            msg = self._protocol.receive_message(client_sock)
-            self.__handle_client_message(client_sock, msg)            
-            # DONE: Modify the send to avoid short-writes
-            
-        except OSError as e:
-            logging.error("action: receive_message | result: fail | error: {e}")
-        finally:
-            client_sock.close()
+        amount_of_bets = [0]
+        while True:
+            try:
+                # logging.info(f'Receiving messages')
+                msgs = self._protocol.receive_messages(client_sock)
+                # logging.info(f'Messages {msgs.split(MESSAGE_DELIMITER_STR)}')
+                for msg in msgs.split(MESSAGE_DELIMITER_STR):
+                    self.__handle_client_message(client_sock, msg, amount_of_bets)
+            except OSError as e:
+                logging.error("action: receive_message | result: fail | error: {e}")
+                client_sock.close()
+                break
 
     def __accept_new_connection(self):
         """
@@ -167,4 +184,8 @@ class Server:
         except:
             return None
         logging.info(f'action: accept_connections | result: success | ip: {addr[0]}')
-        return c
+        if c is None:
+            return
+        t = threading.Thread(target=self.__handle_client_connection, args=[c])
+        t.start()
+        self._threads.append(t)

@@ -11,31 +11,6 @@ services:
     networks:
       - testing_net
 
-  # netcat:
-  #   container_name: netcat
-  #   build: 
-  #     context: ./netcat
-  #     dockerfile: Dockerfile
-  #   stdin_open: true
-  #   tty: true
-  #   networks:
-  #     - testing_net
-  #   depends_on:
-  #     - server
-
-  # client1:
-  #   container_name: client1
-  #   image: client:latest
-  #   entrypoint: /client
-  #   volumes:
-  #     - ./client/config.yaml:/config.yaml
-  #   environment:
-  #     - CLI_ID=1
-  #   networks:
-  #     - testing_net
-  #   depends_on:
-  #     - server
-
 networks:
   testing_net:
     ipam:

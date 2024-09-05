@@ -14,19 +14,6 @@ def generateServer(f):
     f.write("    networks:\n")
     f.write("      - testing_net\n\n")
 
-def generateEchoService(f):
-    f.write("  netcat:\n")
-    f.write("    container_name: netcat\n")
-    f.write("    build:\n")
-    f.write("      context: ./netcat\n")
-    f.write("      dockerfile: Dockerfile\n")
-    f.write("    stdin_open: true\n")
-    f.write("    tty: true\n")
-    f.write("    networks:\n")
-    f.write("      - testing_net\n")
-    f.write("    depends_on:\n")
-    f.write("      - server\n\n")
-
 def generateClient(f, id):
     f.write("  client" + str(id) + ":\n")
     f.write("    container_name: client" + str(id) + "\n")
@@ -52,7 +39,6 @@ def generateNetwork(f):
 def generateDockerCompose(file_name, client_count):
     f = open(file_name, "w")
     generateServer(f)
-    # generateEchoService(f)
     for id in range(1, int(client_count) + 1):
         generateClient(f, id)
     generateNetwork(f)

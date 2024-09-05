@@ -11,17 +11,17 @@ services:
     networks:
       - testing_net
 
-  netcat:
-    container_name: netcat
-    build: 
-      context: ./netcat
-      dockerfile: Dockerfile
-    stdin_open: true
-    tty: true
-    networks:
-      - testing_net
-    depends_on:
-      - server
+  # netcat:
+  #   container_name: netcat
+  #   build: 
+  #     context: ./netcat
+  #     dockerfile: Dockerfile
+  #   stdin_open: true
+  #   tty: true
+  #   networks:
+  #     - testing_net
+  #   depends_on:
+  #     - server
 
   # client1:
   #   container_name: client1

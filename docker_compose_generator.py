@@ -52,7 +52,7 @@ def generateNetwork(f):
 def generateDockerCompose(file_name, client_count):
     f = open(file_name, "w")
     generateServer(f)
-    generateEchoService(f)
+    # generateEchoService(f)
     for id in range(1, int(client_count) + 1):
         generateClient(f, id)
     generateNetwork(f)

@@ -3,7 +3,7 @@ import logging
 import signal
 
 from enum import Enum
-from common.utils import Bet, store_bets
+from common.utils import Bet, has_won, load_bets, store_bets
 
 MESSAGE_DELIMITER = b'\n'
 FIELD_DELIMITER = '|'
@@ -13,6 +13,7 @@ class Action(str, Enum):
     APUESTA = 'APUESTA'
     FIN_APUESTA = 'FINAPUESTA'
     CONFIRMAR_APUESTA = 'CONFIRMARAPUESTA'
+    GANADORES = 'GANADORES'
 
 class Protocol:
     def __init__(self, field_delimiter, message_delimiter):
@@ -93,6 +94,14 @@ class Server:
         bet = Bet(bet_parts[0], bet_parts[1], bet_parts[2], bet_parts[3], bet_parts[4], bet_parts[5])
         self.__save_client_bets([bet])
     
+    def __get_winners(self):
+        amount_of_winners = 0
+        list_of_bets = load_bets()
+        for bet in list_of_bets:
+            if has_won(bet):
+                amount_of_winners += 1
+        return amount_of_winners
+    
     def __handle_client_message(self, client_sock, msg):
         """
         Handle every possible client message
@@ -101,17 +110,28 @@ class Server:
         msg_parts = msg.split(BET_DELIMITER)
         # logging.info(f'msg_parts: {msg_parts}')
         amount_of_bets = 0
+        betting_ended = False
         for msg in msg_parts:
             # logging.info(f'msg: {msg}')
-            if msg.split(FIELD_DELIMITER)[0] == Action.APUESTA:
+            if msg.split(FIELD_DELIMITER)[0] == Action.APUESTA and not betting_ended:
                 amount_of_bets += 1
                 msg_fields = msg.split(FIELD_DELIMITER)
                 self.__handle_client_bet(client_sock, msg_fields[1:])
+            elif msg.split(FIELD_DELIMITER)[0] == Action.FIN_APUESTA:
+                betting_ended = True
+                logging.info(f'action: apuesta_recibida | result: success | cantidad: ${amount_of_bets}')
+                if amount_of_bets > 0:
+                    self._protocol.send_message(client_sock, f'{Action.CONFIRMAR_APUESTA}|{amount_of_bets}')
+            elif msg.split(FIELD_DELIMITER)[0] == Action.GANADORES:
+                # Hacer sorteo y devolver ganadores
+                # Modificar para cambiar barrera y solo si
+                # terminaron las 5 hacer el sorteo
+                logging.info(f'action: sorteo | result: success')
+                amount_of_winners = self.__get_winners()
+                self._protocol.send_message(client_sock, f'{Action.GANADORES}|{amount_of_winners}')
             else:
                 logging.info(f'msg outside if: {msg}, {msg.split(FIELD_DELIMITER)[0]}')
-        logging.info(f'action: apuesta_recibida | result: success | cantidad: ${amount_of_bets}')
-        if amount_of_bets > 0:
-            self._protocol.send_message(client_sock, f'{Action.CONFIRMAR_APUESTA}|{amount_of_bets}') 
+        
         
 
     def __handle_client_connection(self, client_sock):

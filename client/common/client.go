@@ -19,6 +19,9 @@ const MESSAGE_DELIMITER byte = 10
 const FIELD_DELIMITER string = "|"
 const BET_DELIMITER string = ";"
 const MAX_PACKET_SIZE int = 8000
+const APUESTA string = "APUESTA"
+const FIN_APUESTA string = "FINAPUESTA"
+const GANADORES string = "GANADORES"
 
 var log = logging.MustGetLogger("log")
 
@@ -100,7 +103,7 @@ func (p *Protocol) receiveMessage(conn net.Conn) (string, error) {
 func (p *Protocol) formatBets(bets []Bet) (string, error) {
 	formattedBets := ""
 	for idx, bet := range bets {
-		formattedBets += "APUESTA" + FIELD_DELIMITER + bet.agency + FIELD_DELIMITER + bet.firstName + FIELD_DELIMITER + bet.lastName + FIELD_DELIMITER + bet.document + FIELD_DELIMITER + bet.birthdate + FIELD_DELIMITER + bet.number
+		formattedBets += APUESTA + FIELD_DELIMITER + bet.agency + FIELD_DELIMITER + bet.firstName + FIELD_DELIMITER + bet.lastName + FIELD_DELIMITER + bet.document + FIELD_DELIMITER + bet.birthdate + FIELD_DELIMITER + bet.number
 		if idx != len(bets)-1 {
 			formattedBets += BET_DELIMITER
 		}
@@ -156,10 +159,16 @@ func (c *Client) sendMessage(msg string) {
 		return
 	}
 
-	log.Infof("action: apuesta_enviada | result: success | cantidad: %v",
-		msgParts[1],
-	)
+	if msgParts[0] == GANADORES {
+		log.Infof("action: consulta_ganadores | result: success | cant_ganadores: %v",
+			msgParts[1],
+		)
 
+	} else {
+		log.Infof("action: apuesta_enviada | result: success | cantidad: %v",
+			msgParts[1],
+		)
+	}
 }
 
 func (c *Client) getBets(fileScanner *bufio.Scanner, currPacketSize *int) ([]Bet, error) {
@@ -191,6 +200,7 @@ func (c *Client) getBets(fileScanner *bufio.Scanner, currPacketSize *int) ([]Bet
 
 func (c *Client) makeBets(agency_files []*zip.File) {
 	currPacketSize := 0
+	lastBet := false
 	for _, agency_file := range agency_files {
 		file, err := agency_file.Open()
 		if err != nil {
@@ -204,6 +214,8 @@ func (c *Client) makeBets(agency_files []*zip.File) {
 			if err != nil {
 				if len(bets) == 0 {
 					break
+				} else {
+					lastBet = true
 				}
 			}
 
@@ -212,7 +224,12 @@ func (c *Client) makeBets(agency_files []*zip.File) {
 				break
 			}
 			currPacketSize = 0
-			c.sendMessage(fmt.Sprintf("%v%c", formattedBets, MESSAGE_DELIMITER))
+			if lastBet {
+				c.sendMessage(fmt.Sprintf("%v%c", formattedBets, MESSAGE_DELIMITER))
+			} else {
+				message := formattedBets + ";" + FIN_APUESTA + ";" + GANADORES
+				c.sendMessage(fmt.Sprintf("%v%c", message, MESSAGE_DELIMITER))
+			}
 		}
 		file.Close()
 	}
@@ -226,6 +243,11 @@ func (c *Client) getAllAgencyFiles(dataset *zip.ReadCloser) []*zip.File {
 		}
 	}
 	return agency_files
+}
+
+func (c *Client) getWinners() {
+	message := GANADORES
+	c.sendMessage(fmt.Sprintf("%v%c", message, MESSAGE_DELIMITER))
 }
 
 // StartClientLoop Send messages to the client until some time threshold is met
@@ -242,6 +264,8 @@ func (c *Client) StartClientLoop() {
 	if len(agency_files) != 0 {
 		log.Infof("agency_files_last_name: %v", agency_files[len(agency_files)-1].Name)
 		c.makeBets(agency_files)
+		// OBTENER GANADORES
+		c.getWinners()
 	}
 
 	signalRecv := <-signalChannel

@@ -11,7 +11,6 @@ def generateServer(f):
     f.write("      - ./server/config.ini:/config.ini\n")
     f.write("    environment:\n")
     f.write("      - PYTHONUNBUFFERED=1\n")
-    f.write("      - LOGGING_LEVEL=DEBUG\n")
     f.write("    networks:\n")
     f.write("      - testing_net\n\n")
 
@@ -24,7 +23,6 @@ def generateClient(f, id):
     f.write("      - ./client/config.yaml:/config.yaml\n")
     f.write("    environment:\n")
     f.write("      - CLI_ID=" + str(id) + "\n")
-    f.write("      - CLI_LOG_LEVEL=DEBUG\n")
     f.write("    networks:\n")
     f.write("      - testing_net\n")
     f.write("    depends_on:\n")

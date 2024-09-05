@@ -32,6 +32,12 @@ Delimitador de comandos: ';'
 Delimitador de campos: '|'
    - Se utiliza para poder separar los campos de un comando
 
+La accion FINAPUESTA no tiene contenido, es decir, solamente con el envio de la accion luego de previamente haber enviado mensajes APUESTA alcanza para que el servidor sepa que el cliente ha finalizado con su batch de apuestas.
+
+CONFIRMARAPUESTA esta compuesta por la accion misma y seguida de un numero que representa el total de las apuestas del batch (que a su vez tienen que haber sido procesadas exitosamente).
+
+Por otro lado, la accion GANADORES no tiene contenido del lado de cliente pero si del servidor, dado que una vez hecho el sorteo, el servidor le envia al cliente la accion GANADORES junto con DNIs de los ganadores.
+
 Por ejemplo, para el realizar una apuesta se utilizaran los siguientes campos:
 
 - ACCION (APUESTA)
@@ -42,6 +48,10 @@ Por ejemplo, para el realizar una apuesta se utilizaran los siguientes campos:
 - NACIMIENTO
 - NUMERO
 
+Un ejemplo de un mensaje que contiene dos apuestas es el siguiente:
+
+`APUESTA|ID1|NOMBRE1|APELLIDO1|DOCUMENTO1|NACIMIENTO1|NUMERO1;APUESTA|ID2|NOMBRE2|APELLIDO2|DOCUMENTO2|NACIMIENTO2|NUMERO2\n`
+
 ## Sincronizacion
 ### Mutex
 En el presente trabajo se utiliza el mutex como herramienta de sincronizacion del uso de un recurso compartido entre varios threads, como puede ser la libreria apuestas provista por la catedra, cuyas funciones no son thread-safe y controlan el acceso a un recurso compartido.
@@ -50,16 +60,18 @@ Ejemplos de uso:
 
 ```
 with self._lock:
-            store_bets(bets)
+   store_bets(bets)
 ```
 
 ```
 with self._lock:
-            list_of_bets = load_bets()
-            for bet in list_of_bets:
-                if bet.agency == int(agency) and has_won(bet):
-                    winners_documents.append(bet.document)
+   list_of_bets = load_bets()
+   for bet in list_of_bets:
+         if bet.agency == int(agency) and has_won(bet):
+            winners_documents.append(bet.document)
 ```
+
+Como podemos observar en estos ejemplos, siempre se adquiere el lock al momento de acceder a recursos compartidos
 
 ### Barrera
 La barrera es otra herramienta de sincronizacion que se utiliza para determinar el momento a realizar el sorteo, dado que es necesario que todas las cinco agencias hayan finalizado las apuestas para poder determinar ganadores. En consecuencia, las agencias que hayan terminado primero deberan esperar a las demas mediante una barrera, lo que permite ademas que la espera no sea con un mal uso de los recursos como busy-wait.

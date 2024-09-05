@@ -26,7 +26,6 @@ class Protocol:
         """
         msg_bytes = bytes(msg, encoding='utf8') + self._message_delimiter
         bytes_sent = client_sock.send(msg_bytes)
-        # logging.info(f'bytes_sent: {bytes_sent}, len(msg_bytes): {len(msg_bytes)}')
         while bytes_sent != len(msg_bytes):
             bytes_sent += client_sock.send(msg_bytes[:bytes_sent])
 
@@ -43,7 +42,6 @@ class Protocol:
         msg.append(data)
         addr = client_sock.getpeername()
         msg_without_delimiter = msg[:len(self._message_delimiter)]
-        # logging.info(f'action: receive_message | result: success | ip: {addr[0]} | msg: {msg_without_delimiter}')
         return b"".join((msg_without_delimiter)).rstrip().decode('utf-8')
 
 class Server:
@@ -76,8 +74,6 @@ class Server:
         
         signal.signal(signal.SIGTERM, __sigterm_handler)
 
-        # TODO: Modify this program to handle signal to graceful shutdown
-        # the server
         while not self._signal_received:
             client_sock = self.__accept_new_connection()
             if client_sock is None:
@@ -97,12 +93,9 @@ class Server:
         """
         Handle every possible client message
         """
-        # INPROGESS: Add support for batch messages
         msg_parts = msg.split(BET_DELIMITER)
-        # logging.info(f'msg_parts: {msg_parts}')
         amount_of_bets = 0
         for msg in msg_parts:
-            # logging.info(f'msg: {msg}')
             if msg.split(FIELD_DELIMITER)[0] == Action.APUESTA:
                 amount_of_bets += 1
                 msg_fields = msg.split(FIELD_DELIMITER)
@@ -122,10 +115,8 @@ class Server:
         client socket will also be closed
         """
         try:
-            # DONE: Modify the receive to avoid short-reads
             msg = self._protocol.receive_message(client_sock)
             self.__handle_client_message(client_sock, msg)            
-            # DONE: Modify the send to avoid short-writes
             
         except OSError as e:
             logging.error("action: receive_message | result: fail | error: {e}")

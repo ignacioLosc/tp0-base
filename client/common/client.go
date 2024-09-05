@@ -171,7 +171,6 @@ func (c *Client) getBets(fileScanner *bufio.Scanner, currPacketSize *int) ([]Bet
 	for i := 0; i < c.config.BatchMaxAmount; i++ {
 		canScan := fileScanner.Scan()
 		if !canScan {
-			// return bets, nil
 			return bets, fmt.Errorf("no more bets to read")
 		} else {
 			betCsv := fileScanner.Text()
@@ -180,9 +179,6 @@ func (c *Client) getBets(fileScanner *bufio.Scanner, currPacketSize *int) ([]Bet
 				break
 			}
 			betFields := strings.Split(betCsv, ",")
-			// log.Infof("BET FIELDS: %v",
-			// 	betFields,
-			// )
 			bets = append(bets, Bet{c.config.ID, betFields[0], betFields[1], betFields[2], betFields[3], betFields[4]})
 		}
 	}

@@ -130,7 +130,6 @@ func (c *Client) sendMessage() {
 	c.config.Protocol.writeMessage(c.conn, msg)
 
 	msg, err := c.config.Protocol.receiveMessage(c.conn)
-	//log.Infof("MESSAGE: %v", msg)
 	msgParts := strings.Split(msg, FIELD_DELIMITER)
 	c.conn.Close()
 

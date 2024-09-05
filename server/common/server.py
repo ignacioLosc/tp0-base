@@ -61,8 +61,6 @@ class Server:
         
         signal.signal(signal.SIGTERM, __sigterm_handler)
 
-        # TODO: Modify this program to handle signal to graceful shutdown
-        # the server
         while not self._signal_received:
             client_sock = self.__accept_new_connection()
             if client_sock is None:
@@ -82,7 +80,6 @@ class Server:
     def __handle_client_message(self, client_sock, msg):
         # TODO: Add support for batch messages
         msg_parts = msg.split(FIELD_DELIMITER)
-        #logging.info(f'MSG PARTS {msg_parts}')
         if msg_parts[0] == Action.APUESTA:
             self.__handle_client_bet(client_sock, msg_parts[1:])
         
@@ -95,10 +92,8 @@ class Server:
         client socket will also be closed
         """
         try:
-            # DONE: Modify the receive to avoid short-reads
             msg = self._protocol.receive_message(client_sock)
             self.__handle_client_message(client_sock, msg)            
-            # DONE: Modify the send to avoid short-writes
             
         except OSError as e:
             logging.error("action: receive_message | result: fail | error: {e}")

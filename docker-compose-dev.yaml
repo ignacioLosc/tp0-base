@@ -5,10 +5,9 @@ services:
     image: server:latest
     entrypoint: python3 /main.py
     volumes:
-      - ${PWD}/server/config.ini:/config.ini
+      - ./server/config.ini:/config.ini
     environment:
       - PYTHONUNBUFFERED=1
-      - LOGGING_LEVEL=DEBUG
     networks:
       - testing_net
 
@@ -17,11 +16,10 @@ services:
   #   image: client:latest
   #   entrypoint: /client
   #   volumes:
-  #     - ${PWD}/client/config.yaml:/config.yaml
-  #     - ${PWD}/.data/dataset.zip:/dataset.zip
+  #     - ./client/config.yaml:/config.yaml
+  #     - ./.data/dataset.zip:/dataset.zip
   #   environment:
   #     - CLI_ID=1
-  #     - CLI_LOG_LEVEL=DEBUG
   #   networks:
   #     - testing_net
   #   depends_on:
@@ -34,11 +32,10 @@ services:
   #     context: .
   #   entrypoint: /client
   #   volumes:
-  #     - ${PWD}/client/config.yaml:/config.yaml
-  #     - ${PWD}/.data/dataset.zip:/dataset.zip
+  #     - ./client/config.yaml:/config.yaml
+  #     - ./.data/dataset.zip:/dataset.zip
   #   environment:
   #     - CLI_ID=2
-  #     - CLI_LOG_LEVEL=DEBUG
   #   networks:
   #     - testing_net
   #   depends_on:
@@ -51,11 +48,10 @@ services:
   #     context: .
   #   entrypoint: /client
   #   volumes:
-  #     - ${PWD}/client/config.yaml:/config.yaml
-  #     - ${PWD}/.data/dataset.zip:/dataset.zip
+  #     - ./client/config.yaml:/config.yaml
+  #     - ./.data/dataset.zip:/dataset.zip
   #   environment:
   #     - CLI_ID=3
-  #     - CLI_LOG_LEVEL=DEBUG
   #   networks:
   #     - testing_net
   #   depends_on:
@@ -68,11 +64,10 @@ services:
   #     context: .
   #   entrypoint: /client
   #   volumes:
-  #     - ${PWD}/client/config.yaml:/config.yaml
-  #     - ${PWD}/.data/dataset.zip:/dataset.zip
+  #     - ./client/config.yaml:/config.yaml
+  #     - ./.data/dataset.zip:/dataset.zip
   #   environment:
   #     - CLI_ID=4
-  #     - CLI_LOG_LEVEL=DEBUG
   #   networks:
   #     - testing_net
   #   depends_on:
@@ -85,8 +80,8 @@ services:
       context: .
     entrypoint: /client
     volumes:
-      - ${PWD}/client/config.yaml:/config.yaml
-      - ${PWD}/.data/dataset.zip:/dataset.zip
+      - ./client/config.yaml:/config.yaml
+      - ./.data/dataset.zip:/dataset.zip
     environment:
       - CLI_ID=5
       - CLI_LOG_LEVEL=DEBUG

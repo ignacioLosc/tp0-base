@@ -12,78 +12,81 @@ services:
     networks:
       - testing_net
 
-  client1:
-    container_name: client1
-    build:
-      dockerfile: ./client/Dockerfile.client1
-      context: .
-    entrypoint: /client
-    volumes:
-      - ${PWD}/client/config1.yaml:/config.yaml
-    environment:
-      - CLI_ID=1
-      - CLI_LOG_LEVEL=DEBUG
-    networks:
-      - testing_net
-    depends_on:
-      - server
+  # client1:
+  #   container_name: client1
+  #   image: client:latest
+  #   entrypoint: /client
+  #   volumes:
+  #     - ${PWD}/client/config.yaml:/config.yaml
+  #     - ${PWD}/.data/dataset.zip:/dataset.zip
+  #   environment:
+  #     - CLI_ID=1
+  #     - CLI_LOG_LEVEL=DEBUG
+  #   networks:
+  #     - testing_net
+  #   depends_on:
+  #     - server
 
-  client2:
-    container_name: client2
-    build:
-      dockerfile: ./client/Dockerfile.client2
-      context: .
-    entrypoint: /client
-    volumes:
-      - ${PWD}/client/config2.yaml:/config.yaml
-    environment:
-      - CLI_ID=2
-      - CLI_LOG_LEVEL=DEBUG
-    networks:
-      - testing_net
-    depends_on:
-      - server
+  # client2:
+  #   container_name: client2
+  #   build:
+  #     dockerfile: ./client/Dockerfile
+  #     context: .
+  #   entrypoint: /client
+  #   volumes:
+  #     - ${PWD}/client/config.yaml:/config.yaml
+  #     - ${PWD}/.data/dataset.zip:/dataset.zip
+  #   environment:
+  #     - CLI_ID=2
+  #     - CLI_LOG_LEVEL=DEBUG
+  #   networks:
+  #     - testing_net
+  #   depends_on:
+  #     - server
 
-  client3:
-    container_name: client3
-    build:
-      dockerfile: ./client/Dockerfile.client3
-      context: .
-    entrypoint: /client
-    volumes:
-      - ${PWD}/client/config3.yaml:/config.yaml
-    environment:
-      - CLI_ID=3
-      - CLI_LOG_LEVEL=DEBUG
-    networks:
-      - testing_net
-    depends_on:
-      - server
+  # client3:
+  #   container_name: client3
+  #   build:
+  #     dockerfile: ./client/Dockerfile
+  #     context: .
+  #   entrypoint: /client
+  #   volumes:
+  #     - ${PWD}/client/config.yaml:/config.yaml
+  #     - ${PWD}/.data/dataset.zip:/dataset.zip
+  #   environment:
+  #     - CLI_ID=3
+  #     - CLI_LOG_LEVEL=DEBUG
+  #   networks:
+  #     - testing_net
+  #   depends_on:
+  #     - server
 
-  client4:
-    container_name: client4
-    build:
-      dockerfile: ./client/Dockerfile.client4
-      context: .
-    entrypoint: /client
-    volumes:
-      - ${PWD}/client/config4.yaml:/config.yaml
-    environment:
-      - CLI_ID=4
-      - CLI_LOG_LEVEL=DEBUG
-    networks:
-      - testing_net
-    depends_on:
-      - server
+  # client4:
+  #   container_name: client4
+  #   build:
+  #     dockerfile: ./client/Dockerfile
+  #     context: .
+  #   entrypoint: /client
+  #   volumes:
+  #     - ${PWD}/client/config.yaml:/config.yaml
+  #     - ${PWD}/.data/dataset.zip:/dataset.zip
+  #   environment:
+  #     - CLI_ID=4
+  #     - CLI_LOG_LEVEL=DEBUG
+  #   networks:
+  #     - testing_net
+  #   depends_on:
+  #     - server
 
   client5:
     container_name: client5
     build:
-      dockerfile: ./client/Dockerfile.client5
+      dockerfile: ./client/Dockerfile
       context: .
     entrypoint: /client
     volumes:
-      - ${PWD}/client/config5.yaml:/config.yaml
+      - ${PWD}/client/config.yaml:/config.yaml
+      - ${PWD}/.data/dataset.zip:/dataset.zip
     environment:
       - CLI_ID=5
       - CLI_LOG_LEVEL=DEBUG

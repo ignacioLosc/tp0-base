@@ -22,6 +22,7 @@ def generateClient(f, id):
     f.write("    entrypoint: /client\n")
     f.write("    volumes:\n")
     f.write("      - ${PWD}/client/config.yaml:/config.yaml\n")
+    f.write("      - ${PWD}/.data/dataset.zip:/dataset.zip\n")
     f.write("    environment:\n")
     f.write("      - CLI_ID=" + str(id) + "\n")
     f.write("      - CLI_LOG_LEVEL=DEBUG\n")

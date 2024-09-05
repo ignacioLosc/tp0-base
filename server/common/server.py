@@ -7,6 +7,8 @@ from common.utils import Bet, store_bets
 
 MESSAGE_DELIMITER = b'\n'
 FIELD_DELIMITER = '|'
+BET_DELIMITER = ';'
+
 class Action(str, Enum):
     APUESTA = 'APUESTA'
     FIN_APUESTA = 'FINAPUESTA'
@@ -18,12 +20,21 @@ class Protocol:
         self._message_delimiter = message_delimiter
 
     def send_message(self, client_sock, msg):
-        msg_bytes = bytes(msg) + self._message_delimiter
+        """
+        Sends message to socket.
+        Avoids short write error
+        """
+        msg_bytes = bytes(msg, encoding='utf8') + self._message_delimiter
         bytes_sent = client_sock.send(msg_bytes)
-        while bytes_sent != len(msg_bytes) + len(self._message_delimiter):
+        # logging.info(f'bytes_sent: {bytes_sent}, len(msg_bytes): {len(msg_bytes)}')
+        while bytes_sent != len(msg_bytes):
             bytes_sent += client_sock.send(msg_bytes[:bytes_sent])
 
     def receive_message(self, client_sock):
+        """
+        Receives message from socket.
+        Avoids short read error
+        """
         msg = []
         data = client_sock.recv(1024)
         while not data.endswith(self._message_delimiter):
@@ -32,7 +43,7 @@ class Protocol:
         msg.append(data)
         addr = client_sock.getpeername()
         msg_without_delimiter = msg[:len(self._message_delimiter)]
-        logging.info(f'action: receive_message | result: success | ip: {addr[0]} | msg: {msg_without_delimiter}')
+        # logging.info(f'action: receive_message | result: success | ip: {addr[0]} | msg: {msg_without_delimiter}')
         return b"".join((msg_without_delimiter)).rstrip().decode('utf-8')
 
 class Server:
@@ -54,6 +65,10 @@ class Server:
         """
 
         def __sigterm_handler(__signo, __stack_frame):
+            """
+            Handle SIGTERM signal so as to have
+            a graceful shutdown of the program execution
+            """
             logging.info(f'action: receive_signal {signal.Signals(__signo).name} | result: success')
             self._server_socket.close()
             self._signal_received = True
@@ -77,14 +92,26 @@ class Server:
     def __handle_client_bet(self, client_sock, bet_parts: list[str]):
         bet = Bet(bet_parts[0], bet_parts[1], bet_parts[2], bet_parts[3], bet_parts[4], bet_parts[5])
         self.__save_client_bets([bet])
-        self._protocol.send_message(client_sock, bytes(f'{Action.CONFIRMAR_APUESTA}|{bet.document}|{bet.number}', encoding='utf8')) 
     
     def __handle_client_message(self, client_sock, msg):
-        # TODO: Add support for batch messages
-        msg_parts = msg.split(FIELD_DELIMITER)
-        #logging.info(f'MSG PARTS {msg_parts}')
-        if msg_parts[0] == Action.APUESTA:
-            self.__handle_client_bet(client_sock, msg_parts[1:])
+        """
+        Handle every possible client message
+        """
+        # INPROGESS: Add support for batch messages
+        msg_parts = msg.split(BET_DELIMITER)
+        # logging.info(f'msg_parts: {msg_parts}')
+        amount_of_bets = 0
+        for msg in msg_parts:
+            # logging.info(f'msg: {msg}')
+            if msg.split(FIELD_DELIMITER)[0] == Action.APUESTA:
+                amount_of_bets += 1
+                msg_fields = msg.split(FIELD_DELIMITER)
+                self.__handle_client_bet(client_sock, msg_fields[1:])
+            else:
+                logging.info(f'msg outside if: {msg}, {msg.split(FIELD_DELIMITER)[0]}')
+        logging.info(f'action: apuesta_recibida | result: success | cantidad: ${amount_of_bets}')
+        if amount_of_bets > 0:
+            self._protocol.send_message(client_sock, f'{Action.CONFIRMAR_APUESTA}|{amount_of_bets}') 
         
 
     def __handle_client_connection(self, client_sock):

@@ -1,6 +1,7 @@
 package common
 
 import (
+	"archive/zip"
 	"bufio"
 	"fmt"
 	"io"
@@ -16,21 +17,34 @@ import (
 
 const MESSAGE_DELIMITER byte = 10
 const FIELD_DELIMITER string = "|"
+const BET_DELIMITER string = ";"
+const MAX_PACKET_SIZE int = 8000
 
 var log = logging.MustGetLogger("log")
 
+type Bet struct {
+	agency    string
+	firstName string
+	lastName  string
+	document  string
+	birthdate string
+	number    string
+}
+
 // ClientConfig Configuration used by the client
 type ClientConfig struct {
-	ID            string
-	ServerAddress string
-	LoopAmount    int
-	LoopPeriod    time.Duration
-	NOMBRE        string
-	APELLIDO      string
-	DOCUMENTO     string
-	NACIMIENTO    string
-	NUMERO        string
-	Protocol      *Protocol
+	ID             string
+	ServerAddress  string
+	LoopAmount     int
+	LoopPeriod     time.Duration
+	BatchMaxAmount int
+	NOMBRE         string
+	APELLIDO       string
+	DOCUMENTO      string
+	NACIMIENTO     string
+	NUMERO         string
+	Protocol       *Protocol
+	DataPath       string
 }
 
 type Protocol struct {
@@ -66,6 +80,9 @@ func (p *Protocol) receiveMessage(conn net.Conn) (string, error) {
 	msg := make([]byte, 0)
 	data := make([]byte, 1024)
 	bytesReceived, err := bufio.NewReader(conn).Read(data)
+	if err != nil {
+		return "", err
+	}
 	for data[bytesReceived-1] != MESSAGE_DELIMITER {
 		msg = append(msg, data...)
 		bytesReceived, err = bufio.NewReader(conn).Read(data)
@@ -73,11 +90,22 @@ func (p *Protocol) receiveMessage(conn net.Conn) (string, error) {
 			return "", err
 		}
 	}
-	msg = append(msg, data...)
+	msg = append(msg, data[:bytesReceived-1]...)
 	if err != nil {
 		return "", err
 	}
 	return string(msg), nil
+}
+
+func (p *Protocol) formatBets(bets []Bet) (string, error) {
+	formattedBets := ""
+	for idx, bet := range bets {
+		formattedBets += "APUESTA" + FIELD_DELIMITER + bet.agency + FIELD_DELIMITER + bet.firstName + FIELD_DELIMITER + bet.lastName + FIELD_DELIMITER + bet.document + FIELD_DELIMITER + bet.birthdate + FIELD_DELIMITER + bet.number
+		if idx != len(bets)-1 {
+			formattedBets += BET_DELIMITER
+		}
+	}
+	return formattedBets, nil
 }
 
 // Client Entity that encapsulates how
@@ -111,26 +139,13 @@ func (c *Client) createClientSocket() error {
 	return nil
 }
 
-func (c *Client) sendMessage() {
+func (c *Client) sendMessage(msg string) {
 	// Create the connection the server in every loop iteration. Send an
 	c.createClientSocket()
 
-	// DONE: Modify the send to avoid short-write
-	msg := fmt.Sprintf(
-		"%v|%v|%v|%v|%v|%v|%v%c",
-		"APUESTA",
-		c.config.ID,
-		c.config.NOMBRE,
-		c.config.APELLIDO,
-		c.config.DOCUMENTO,
-		c.config.NACIMIENTO,
-		c.config.NUMERO,
-		MESSAGE_DELIMITER,
-	)
 	c.config.Protocol.writeMessage(c.conn, msg)
 
 	msg, err := c.config.Protocol.receiveMessage(c.conn)
-	//log.Infof("MESSAGE: %v", msg)
 	msgParts := strings.Split(msg, FIELD_DELIMITER)
 	c.conn.Close()
 
@@ -141,22 +156,97 @@ func (c *Client) sendMessage() {
 		return
 	}
 
-	log.Infof("action: apuesta_enviada | result: success | dni: %v | numero: %v",
+	log.Infof("action: apuesta_enviada | result: success | cantidad: %v",
 		msgParts[1],
-		msgParts[2],
 	)
 
+}
+
+func (c *Client) getBets(fileScanner *bufio.Scanner, currPacketSize *int) ([]Bet, error) {
+	if c.config.BatchMaxAmount == 0 {
+		return nil, fmt.Errorf("cant send 0 bets")
+	}
+	bets := make([]Bet, 0)
+
+	for i := 0; i < c.config.BatchMaxAmount; i++ {
+		canScan := fileScanner.Scan()
+		if !canScan {
+			// return bets, nil
+			return bets, fmt.Errorf("no more bets to read")
+		} else {
+			betCsv := fileScanner.Text()
+			*currPacketSize += len(betCsv)
+			if *currPacketSize > MAX_PACKET_SIZE {
+				break
+			}
+			betFields := strings.Split(betCsv, ",")
+			// log.Infof("BET FIELDS: %v",
+			// 	betFields,
+			// )
+			bets = append(bets, Bet{c.config.ID, betFields[0], betFields[1], betFields[2], betFields[3], betFields[4]})
+		}
+	}
+	return bets, nil
+}
+
+func (c *Client) makeBets(agency_files []*zip.File) {
+	currPacketSize := 0
+	for _, agency_file := range agency_files {
+		file, err := agency_file.Open()
+		if err != nil {
+			log.Infof("COULDNT OPEN FILE %v", err.Error())
+			return
+		}
+		fileScanner := bufio.NewScanner(file)
+		fileScanner.Split(bufio.ScanLines)
+		for {
+			bets, err := c.getBets(fileScanner, &currPacketSize)
+			if err != nil {
+				if len(bets) == 0 {
+					break
+				}
+			}
+
+			formattedBets, err := c.config.Protocol.formatBets(bets)
+			if err != nil || len(formattedBets) == 0 {
+				break
+			}
+			currPacketSize = 0
+			c.sendMessage(fmt.Sprintf("%v%c", formattedBets, MESSAGE_DELIMITER))
+		}
+		file.Close()
+	}
+}
+
+func (c *Client) getAllAgencyFiles(dataset *zip.ReadCloser) []*zip.File {
+	agency_files := make([]*zip.File, 0)
+	for _, f := range dataset.File {
+		if strings.HasPrefix(f.Name, fmt.Sprintf("agency-%v", c.config.ID)) {
+			agency_files = append(agency_files, f)
+		}
+	}
+	return agency_files
 }
 
 // StartClientLoop Send messages to the client until some time threshold is met
 func (c *Client) StartClientLoop() {
 	signalChannel := make(chan os.Signal, 1)
 	signal.Notify(signalChannel, os.Interrupt, syscall.SIGTERM)
-	// There is an autoincremental msgID to identify every message sent
-	// Messages if the message amount threshold has not been surpassed
-	c.sendMessage()
+
+	dataset, err := zip.OpenReader("dataset.zip")
+	if err != nil {
+		log.Infof("action: open_dataset | result: fail %v", err.Error())
+	}
+
+	agency_files := c.getAllAgencyFiles(dataset)
+	if len(agency_files) != 0 {
+		log.Infof("agency_files_last_name: %v", agency_files[len(agency_files)-1].Name)
+		c.makeBets(agency_files)
+	}
+
 	signalRecv := <-signalChannel
 	log.Infof("action: %v | result: success | client_id: %v", signalRecv.String(), c.config.ID)
 	c.conn.Close()
+	dataset.Close()
 	log.Infof("action: close_connection | result: success | client_id: %v", signalRecv.String(), c.config.ID)
 }

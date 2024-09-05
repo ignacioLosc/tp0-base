@@ -37,6 +37,7 @@ func InitConfig() (*viper.Viper, error) {
 	v.BindEnv("loop", "period")
 	v.BindEnv("loop", "amount")
 	v.BindEnv("log", "level")
+	v.BindEnv("batch", "maxAmount")
 	v.BindEnv("client", "NOMBRE")
 	v.BindEnv("client", "APELLIDO")
 	v.BindEnv("client", "DOCUMENTO")
@@ -109,16 +110,17 @@ func main() {
 	PrintConfig(v)
 	protocol := common.NewProtocol("|", byte('\n'))
 	clientConfig := common.ClientConfig{
-		ServerAddress: v.GetString("server.address"),
-		ID:            v.GetString("id"),
-		LoopAmount:    v.GetInt("loop.amount"),
-		LoopPeriod:    v.GetDuration("loop.period"),
-		NOMBRE:        v.GetString("client.NOMBRE"),
-		APELLIDO:      v.GetString("client.APELLIDO"),
-		DOCUMENTO:     v.GetString("client.DOCUMENTO"),
-		NACIMIENTO:    v.GetString("client.NACIMIENTO"),
-		NUMERO:        v.GetString("client.NUMERO"),
-		Protocol:      protocol,
+		ServerAddress:  v.GetString("server.address"),
+		ID:             v.GetString("id"),
+		LoopAmount:     v.GetInt("loop.amount"),
+		LoopPeriod:     v.GetDuration("loop.period"),
+		BatchMaxAmount: v.GetInt("batch.maxAmount"),
+		NOMBRE:         v.GetString("client.NOMBRE"),
+		APELLIDO:       v.GetString("client.APELLIDO"),
+		DOCUMENTO:      v.GetString("client.DOCUMENTO"),
+		NACIMIENTO:     v.GetString("client.NACIMIENTO"),
+		NUMERO:         v.GetString("client.NUMERO"),
+		Protocol:       protocol,
 	}
 
 	client := common.NewClient(clientConfig)

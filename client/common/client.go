@@ -224,6 +224,9 @@ func (c *Client) getBets(fileScanner *bufio.Scanner, currPacketSize *int) ([]Bet
 }
 
 func (c *Client) makeBets(agency_files []*zip.File) {
+	signalChannel := make(chan os.Signal, 1)
+	signal.Notify(signalChannel, os.Interrupt, syscall.SIGTERM)
+
 	currPacketSize := 0
 	lastBet := false
 	for _, agency_file := range agency_files {
@@ -235,6 +238,14 @@ func (c *Client) makeBets(agency_files []*zip.File) {
 		fileScanner := bufio.NewScanner(file)
 		fileScanner.Split(bufio.ScanLines)
 		for {
+			select {
+			case signalRecv := <-signalChannel:
+				log.Infof("action: %v | result: success | client_id: %v", signalRecv.String(), c.config.ID)
+				c.conn.Close()
+				file.Close()
+				return
+			default:
+			}
 			bets, err := c.getBets(fileScanner, &currPacketSize)
 			if err != nil {
 				if len(bets) == 0 {
@@ -274,9 +285,6 @@ func (c *Client) getAllAgencyFiles(dataset *zip.ReadCloser) []*zip.File {
 
 // StartClientLoop Send messages to the client until some time threshold is met
 func (c *Client) StartClientLoop() {
-	signalChannel := make(chan os.Signal, 1)
-	signal.Notify(signalChannel, os.Interrupt, syscall.SIGTERM)
-
 	dataset, err := zip.OpenReader("dataset.zip")
 	if err != nil {
 		log.Infof("action: open_dataset | result: fail %v", err.Error())
@@ -289,9 +297,7 @@ func (c *Client) StartClientLoop() {
 		c.makeBets(agency_files)
 	}
 
-	signalRecv := <-signalChannel
-	log.Infof("action: %v | result: success | client_id: %v", signalRecv.String(), c.config.ID)
 	c.conn.Close()
 	dataset.Close()
-	log.Infof("action: close_connection | result: success | client_id: %v", signalRecv.String(), c.config.ID)
+	log.Infof("action: close_connection | result: success | client_id: %v", c.config.ID)
 }

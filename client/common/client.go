@@ -66,15 +66,15 @@ func NewProtocol(fieldDelimiter string, messageDelimiter byte) *Protocol {
 func (p *Protocol) writeMessage(w io.Writer, message string) error {
 	messageLength := len(message)
 	bytesWritten, err := fmt.Fprint(w, message)
+	if err != nil {
+		return err
+	}
 	for bytesWritten < messageLength {
 		newBytesWritten, err := fmt.Fprint(w, message[:bytesWritten])
 		if err != nil {
 			return err
 		}
 		bytesWritten += newBytesWritten
-	}
-	if err != nil {
-		return err
 	}
 	return nil
 }
@@ -140,15 +140,23 @@ func (c *Client) createClientSocket() error {
 			c.config.ID,
 			err,
 		)
+		return err
 	}
 	c.conn = conn
 	return nil
 }
 
 func (c *Client) sendAndReceiveMessage(msg string) error {
-	c.config.Protocol.writeMessage(c.conn, msg)
+	err := c.config.Protocol.writeMessage(c.conn, msg)
 
-	msg, err := c.config.Protocol.receiveMessage(c.conn)
+	if err != nil {
+		log.Errorf("action: apuesta_enviada | result: fail | error: %v",
+			err,
+		)
+		return err
+	}
+
+	msg, err = c.config.Protocol.receiveMessage(c.conn)
 	msgParts := strings.Split(msg, FIELD_DELIMITER)
 
 	if err != nil {
@@ -224,7 +232,7 @@ func (c *Client) getBets(fileScanner *bufio.Scanner, currPacketSize *int) ([]Bet
 	return bets, nil
 }
 
-func (c *Client) makeBets(agency_files []*zip.File) {
+func (c *Client) makeBets(agency_files []*zip.File) error {
 	signalChannel := make(chan os.Signal, 1)
 	signal.Notify(signalChannel, os.Interrupt, syscall.SIGTERM)
 
@@ -234,7 +242,7 @@ func (c *Client) makeBets(agency_files []*zip.File) {
 		file, err := agency_file.Open()
 		if err != nil {
 			log.Infof("COULDNT OPEN FILE %v", err.Error())
-			return
+			return err
 		}
 		fileScanner := bufio.NewScanner(file)
 		fileScanner.Split(bufio.ScanLines)
@@ -242,15 +250,14 @@ func (c *Client) makeBets(agency_files []*zip.File) {
 			select {
 			case signalRecv := <-signalChannel:
 				log.Infof("action: %v | result: success | client_id: %v", signalRecv.String(), c.config.ID)
-				c.conn.Close()
 				file.Close()
-				return
+				return nil
 			default:
 			}
 			bets, err := c.getBets(fileScanner, &currPacketSize)
 			if err != nil {
 				if len(bets) == 0 {
-					break
+					return err
 				} else {
 					lastBet = true
 				}
@@ -265,19 +272,20 @@ func (c *Client) makeBets(agency_files []*zip.File) {
 				message := formattedBets + BET_DELIMITER + FIN_APUESTA + BET_DELIMITER + GANADORES + FIELD_DELIMITER + c.config.ID
 				err := c.sendAndReceiveMessage(fmt.Sprintf("%v%c", message, MESSAGE_DELIMITER))
 				if err != nil {
-					break
+					return err
 				}
 				c.waitForWinners()
 				break
 			} else {
 				err := c.sendAndReceiveMessage(fmt.Sprintf("%v%c", formattedBets+BET_DELIMITER+FIN_APUESTA, MESSAGE_DELIMITER))
 				if err != nil {
-					break
+					return err
 				}
 			}
 		}
 		file.Close()
 	}
+	return nil
 }
 
 func (c *Client) getAllAgencyFiles(dataset *zip.ReadCloser) []*zip.File {
@@ -300,8 +308,19 @@ func (c *Client) StartClientLoop() {
 	agency_files := c.getAllAgencyFiles(dataset)
 	if len(agency_files) != 0 {
 		log.Infof("agency_files_last_name: %v", agency_files[len(agency_files)-1].Name)
-		c.createClientSocket()
-		c.makeBets(agency_files)
+		err = c.createClientSocket()
+		if err != nil {
+			dataset.Close()
+			log.Infof("action: close_connection | result: success | client_id: %v", c.config.ID)
+			return
+		}
+		err = c.makeBets(agency_files)
+		if err != nil {
+			dataset.Close()
+			log.Infof("action: end_bets | result: success | client_id: %v", c.config.ID)
+			log.Infof("action: close_connection | result: success | client_id: %v", c.config.ID)
+			return
+		}
 	}
 
 	c.conn.Close()

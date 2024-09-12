@@ -145,7 +145,7 @@ func (c *Client) createClientSocket() error {
 	return nil
 }
 
-func (c *Client) sendAndReceiveMessage(msg string) {
+func (c *Client) sendAndReceiveMessage(msg string) error {
 	c.config.Protocol.writeMessage(c.conn, msg)
 
 	msg, err := c.config.Protocol.receiveMessage(c.conn)
@@ -155,7 +155,7 @@ func (c *Client) sendAndReceiveMessage(msg string) {
 		log.Errorf("action: apuesta_enviada | result: fail | error: %v",
 			err,
 		)
-		return
+		return err
 	}
 	if msgParts[0] == GANADORES {
 		cantGanadores := 0
@@ -171,6 +171,7 @@ func (c *Client) sendAndReceiveMessage(msg string) {
 			msgParts[1],
 		)
 	}
+	return nil
 }
 
 func (c *Client) waitForWinners() {
@@ -262,11 +263,17 @@ func (c *Client) makeBets(agency_files []*zip.File) {
 			currPacketSize = 0
 			if lastBet {
 				message := formattedBets + BET_DELIMITER + FIN_APUESTA + BET_DELIMITER + GANADORES + FIELD_DELIMITER + c.config.ID
-				c.sendAndReceiveMessage(fmt.Sprintf("%v%c", message, MESSAGE_DELIMITER))
+				err := c.sendAndReceiveMessage(fmt.Sprintf("%v%c", message, MESSAGE_DELIMITER))
+				if err != nil {
+					break
+				}
 				c.waitForWinners()
 				break
 			} else {
-				c.sendAndReceiveMessage(fmt.Sprintf("%v%c", formattedBets+BET_DELIMITER+FIN_APUESTA, MESSAGE_DELIMITER))
+				err := c.sendAndReceiveMessage(fmt.Sprintf("%v%c", formattedBets+BET_DELIMITER+FIN_APUESTA, MESSAGE_DELIMITER))
+				if err != nil {
+					break
+				}
 			}
 		}
 		file.Close()

@@ -41,6 +41,8 @@ class Protocol:
         msg = []
         data = client_sock.recv(1024)
         while not data.endswith(self._message_delimiter):
+            if data == b'':
+                raise Exception("Error receiving message from client")
             msg.append(data)
             data = client_sock.recv(1024)
         msg.append(data)
@@ -156,9 +158,9 @@ class Server:
                 msgs = self._protocol.receive_messages(client_sock)
                 for msg in msgs.split(MESSAGE_DELIMITER_STR):
                     self.__handle_client_message(client_sock, msg, amount_of_bets)
-            except OSError as e:
+            except Exception as e:
                 if not self._signal_received:
-                    logging.error("action: receive_message | result: fail | error: {e}")
+                    logging.error(f'action: receive_message | result: fail | error: {str(e)}')
                     client_sock.close()
                 break
 

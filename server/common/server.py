@@ -55,10 +55,31 @@ class Server:
         self._server_socket.listen(listen_backlog)
         self._signal_received = False
         self._protocol = Protocol(field_delimiter='|', message_delimiter=b'\n')
-        self._threads: list[threading.Thread] = []
+        self._threads: list[(threading.Thread, socket.socket)] = []
         self._barrier = threading.Barrier(NUMBER_OF_AGENCIES, timeout=5)
         self._lock = threading.Lock()
+        signal.signal(signal.SIGTERM, self.__sigterm_handler)
 
+    def __sigterm_handler(self, __signo, __stack_frame):
+        """
+        Handle SIGTERM signal so as to have
+        a graceful shutdown of the program execution
+        """
+        logging.info(f'action: receive_signal {signal.Signals(__signo).name} | result: success')
+        self._server_socket.close()
+        self._signal_received = True
+        self._barrier.abort()
+        for _, c in self._threads:
+            try:
+                c.close()
+                logging.info(f'action: close_client_connection | result: success')
+            except:
+                logging.error(f'action: close_client_connection | result: fail')
+        for t, _ in self._threads:
+            t.join()
+        logging.info(f'action: shut_down_server | result: success')
+        return
+    
     def run(self):
         """
         Dummy Server loop
@@ -67,21 +88,6 @@ class Server:
         communication with a client. After client with communucation
         finishes, servers starts to accept new connections again
         """
-
-        def __sigterm_handler(__signo, __stack_frame):
-            """
-            Handle SIGTERM signal so as to have
-            a graceful shutdown of the program execution
-            """
-            logging.info(f'action: receive_signal {signal.Signals(__signo).name} | result: success')
-            self._server_socket.close()
-            self._signal_received = True
-            self._barrier.abort()
-            for t in self._threads:
-                t.join()
-            return
-        
-        signal.signal(signal.SIGTERM, __sigterm_handler)
 
         while not self._signal_received:
             self.__accept_new_connection()
@@ -151,8 +157,9 @@ class Server:
                 for msg in msgs.split(MESSAGE_DELIMITER_STR):
                     self.__handle_client_message(client_sock, msg, amount_of_bets)
             except OSError as e:
-                logging.error("action: receive_message | result: fail | error: {e}")
-                client_sock.close()
+                if not self._signal_received:
+                    logging.error("action: receive_message | result: fail | error: {e}")
+                    client_sock.close()
                 break
 
     def __accept_new_connection(self):
@@ -174,4 +181,4 @@ class Server:
             return
         t = threading.Thread(target=self.__handle_client_connection, args=[c])
         t.start()
-        self._threads.append(t)
+        self._threads.append((t,c))

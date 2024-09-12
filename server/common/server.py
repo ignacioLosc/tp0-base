@@ -11,6 +11,7 @@ MESSAGE_DELIMITER_STR = '\n'
 FIELD_DELIMITER = '|'
 BET_DELIMITER = ';'
 NUMBER_OF_AGENCIES = 5
+EMPTY_BYTE_SOCKET_CLOSED = b''
 
 class Action(str, Enum):
     APUESTA = 'APUESTA'
@@ -41,7 +42,7 @@ class Protocol:
         msg = []
         data = client_sock.recv(1024)
         while not data.endswith(self._message_delimiter):
-            if data == b'':
+            if data == EMPTY_BYTE_SOCKET_CLOSED:
                 raise Exception("Error receiving message from client")
             msg.append(data)
             data = client_sock.recv(1024)

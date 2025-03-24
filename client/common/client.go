@@ -175,7 +175,8 @@ func (c *Client) sendAndReceiveMessage(msg string) error {
 		)
 
 	} else {
-		log.Infof("action: apuesta_enviada | result: success | cantidad: %v",
+		log.Infof("action: apuesta_enviada | result: success | dni: %v | numero: %v",
+			msgParts[1],
 			msgParts[1],
 		)
 	}

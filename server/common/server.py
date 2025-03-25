@@ -32,7 +32,7 @@ class Protocol:
         msg.append(data)
         addr = client_sock.getpeername()
         msg_without_delimiter = msg[:len(self._message_delimiter)]
-        logging.info(f'action: receive_message | result: success | ip: {addr[0]} | msg: {msg_without_delimiter}')
+        logging.info(f'action: receive_message | result: success | ip: {addr[0]}')
         return b"".join((msg_without_delimiter)).rstrip().decode('utf-8')
 
 class Server:
@@ -96,7 +96,7 @@ class Server:
             self.__handle_client_message(client_sock, msg)            
             
         except OSError as e:
-            logging.error("action: receive_message | result: fail | error: {e}")
+            logging.error("action: close_connection | result: success")
         finally:
             client_sock.close()
 

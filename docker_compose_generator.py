@@ -20,7 +20,7 @@ def generateClient(f, id):
     f.write("    image: client:latest\n")
     f.write("    entrypoint: /client\n")
     f.write("    volumes:\n")
-    f.write("      - ./client/config.yaml:/config.yaml\n")
+    f.write("      - ./client/config"+str(id)+".yaml:/config.yaml\n")
     f.write("    environment:\n")
     f.write("      - CLI_ID=" + str(id) + "\n")
     f.write("    networks:\n")

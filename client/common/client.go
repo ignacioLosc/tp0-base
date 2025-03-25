@@ -1,7 +1,6 @@
 package common
 
 import (
-	"archive/zip"
 	"bufio"
 	"fmt"
 	"io"
@@ -218,7 +217,6 @@ func (c *Client) getBets(fileScanner *bufio.Scanner, currPacketSize *int) ([]Bet
 	for i := 0; i < c.config.BatchMaxAmount; i++ {
 		canScan := fileScanner.Scan()
 		if !canScan {
-			// return bets, nil
 			return bets, fmt.Errorf("no more bets to read")
 		} else {
 			betCsv := fileScanner.Text()
@@ -233,98 +231,72 @@ func (c *Client) getBets(fileScanner *bufio.Scanner, currPacketSize *int) ([]Bet
 	return bets, nil
 }
 
-func (c *Client) makeBets(agency_files []*zip.File) error {
+func (c *Client) makeBets(file io.Reader) error {
 	signalChannel := make(chan os.Signal, 1)
 	signal.Notify(signalChannel, os.Interrupt, syscall.SIGTERM)
 
 	currPacketSize := 0
 	lastBet := false
-	for _, agency_file := range agency_files {
-		file, err := agency_file.Open()
+	fileScanner := bufio.NewScanner(file)
+	fileScanner.Split(bufio.ScanLines)
+	for {
+		select {
+		case signalRecv := <-signalChannel:
+			log.Infof("action: %v | result: success | client_id: %v", signalRecv.String(), c.config.ID)
+			return nil
+		default:
+		}
+		bets, err := c.getBets(fileScanner, &currPacketSize)
 		if err != nil {
-			log.Infof("COULDNT OPEN FILE %v", err.Error())
-			return err
-		}
-		fileScanner := bufio.NewScanner(file)
-		fileScanner.Split(bufio.ScanLines)
-		for {
-			select {
-			case signalRecv := <-signalChannel:
-				log.Infof("action: %v | result: success | client_id: %v", signalRecv.String(), c.config.ID)
-				file.Close()
-				return nil
-			default:
-			}
-			bets, err := c.getBets(fileScanner, &currPacketSize)
-			if err != nil {
-				if len(bets) == 0 {
-					return err
-				} else {
-					lastBet = true
-				}
-			}
-
-			formattedBets, err := c.config.Protocol.formatBets(bets)
-			if err != nil || len(formattedBets) == 0 {
-				break
-			}
-			currPacketSize = 0
-			if lastBet {
-				message := formattedBets + BET_DELIMITER + FIN_APUESTA + BET_DELIMITER + GANADORES + FIELD_DELIMITER + c.config.ID
-				err := c.sendAndReceiveMessage(fmt.Sprintf("%v%c", message, MESSAGE_DELIMITER))
-				if err != nil {
-					return err
-				}
-				c.waitForWinners()
-				break
+			if len(bets) == 0 {
+				return err
 			} else {
-				err := c.sendAndReceiveMessage(fmt.Sprintf("%v%c", formattedBets+BET_DELIMITER+FIN_APUESTA, MESSAGE_DELIMITER))
-				if err != nil {
-					return err
-				}
+				lastBet = true
 			}
 		}
-		file.Close()
+
+		formattedBets, err := c.config.Protocol.formatBets(bets)
+		if err != nil || len(formattedBets) == 0 {
+			break
+		}
+		currPacketSize = 0
+		if lastBet {
+			message := formattedBets + BET_DELIMITER + FIN_APUESTA + BET_DELIMITER + GANADORES + FIELD_DELIMITER + c.config.ID
+			err := c.sendAndReceiveMessage(fmt.Sprintf("%v%c", message, MESSAGE_DELIMITER))
+			if err != nil {
+				return err
+			}
+			c.waitForWinners()
+			break
+		} else {
+			err := c.sendAndReceiveMessage(fmt.Sprintf("%v%c", formattedBets+BET_DELIMITER+FIN_APUESTA, MESSAGE_DELIMITER))
+			if err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }
 
-func (c *Client) getAllAgencyFiles(dataset *zip.ReadCloser) []*zip.File {
-	agency_files := make([]*zip.File, 0)
-	for _, f := range dataset.File {
-		if strings.HasPrefix(f.Name, fmt.Sprintf("agency-%v", c.config.ID)) {
-			agency_files = append(agency_files, f)
-		}
-	}
-	return agency_files
-}
-
 // StartClientLoop Send messages to the client until some time threshold is met
 func (c *Client) StartClientLoop() {
-	dataset, err := zip.OpenReader("dataset.zip")
+	file, err := os.Open(fmt.Sprintf("agency-%v.csv", c.config.ID))
 	if err != nil {
 		log.Infof("action: open_dataset | result: fail %v", err.Error())
 	}
 
-	agency_files := c.getAllAgencyFiles(dataset)
-	if len(agency_files) != 0 {
-		log.Infof("agency_files_last_name: %v", agency_files[len(agency_files)-1].Name)
-		err = c.createClientSocket()
-		if err != nil {
-			dataset.Close()
-			log.Infof("action: close_connection | result: success | client_id: %v", c.config.ID)
-			return
-		}
-		err = c.makeBets(agency_files)
-		if err != nil {
-			dataset.Close()
-			log.Infof("action: end_bets | result: success | client_id: %v", c.config.ID)
-			log.Infof("action: close_connection | result: success | client_id: %v", c.config.ID)
-			return
-		}
+	err = c.createClientSocket()
+	if err != nil {
+		log.Infof("action: close_connection | result: success | client_id: %v", c.config.ID)
+		return
+	}
+	err = c.makeBets(file)
+	if err != nil {
+		log.Infof("action: end_bets | result: success | client_id: %v", c.config.ID)
+		log.Infof("action: close_connection | result: success | client_id: %v", c.config.ID)
+		return
 	}
 
 	c.conn.Close()
-	dataset.Close()
 	log.Infof("action: close_connection | result: success | client_id: %v", c.config.ID)
 }

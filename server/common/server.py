@@ -80,7 +80,7 @@ class Server:
                 logging.error(f'action: close_client_connection | result: fail')
         for t, _ in self._threads:
             t.join()
-        logging.info(f'action: shut_down_server | result: success')
+        logging.info(f'action: exit | result: success')
         return
     
     def run(self):
@@ -104,6 +104,7 @@ class Server:
     
     def __handle_client_bet(self, client_sock, bet_parts: list[str]):
         bet = Bet(bet_parts[0], bet_parts[1], bet_parts[2], bet_parts[3], bet_parts[4], bet_parts[5])
+        # Envia una vez por batch
         self._protocol.send_message(client_sock, f'{Action.CONFIRMAR_APUESTA}|{bet.document}|{bet.number}')
         self.__save_client_bets([bet])
     
@@ -133,14 +134,7 @@ class Server:
                 logging.info(f'action: apuesta_recibida | result: success | cantidad: {amount_of_bets[0]}')
                 amount_of_bets[0] = 0
             elif msg.split(FIELD_DELIMITER)[0] == Action.GANADORES:
-                try:
-                    remaining = self._barrier.wait()
-                    if remaining == 0:
-                        logging.info(f'action: sorteo | result: success')
-                    winners_documents = self.__get_winners(msg.split(FIELD_DELIMITER)[1])
-                    self._protocol.send_message(client_sock, f'{Action.GANADORES}|{FIELD_DELIMITER.join(winners_documents)}')
-                except:
-                    return
+                self._protocol.send_message(client_sock, f'{Action.GANADORES}|1|2')
             else:
                 logging.info(f'UNHANDLED MESSAGE: {msg}, {msg.split(FIELD_DELIMITER)[0]}')
         

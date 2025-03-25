@@ -104,8 +104,6 @@ class Server:
     
     def __handle_client_bet(self, client_sock, bet_parts: list[str]):
         bet = Bet(bet_parts[0], bet_parts[1], bet_parts[2], bet_parts[3], bet_parts[4], bet_parts[5])
-        # Envia una vez por batch
-        self._protocol.send_message(client_sock, f'{Action.CONFIRMAR_APUESTA}|{bet.document}|{bet.number}')
         self.__save_client_bets([bet])
     
     def __get_winners(self, agency):
@@ -132,6 +130,8 @@ class Server:
             elif msg.split(FIELD_DELIMITER)[0] == Action.FIN_APUESTA:
                 betting_ended = True
                 logging.info(f'action: apuesta_recibida | result: success | cantidad: {amount_of_bets[0]}')
+                # Envia una vez por batch
+                self._protocol.send_message(client_sock, f'{Action.CONFIRMAR_APUESTA}|1|2')
                 amount_of_bets[0] = 0
             elif msg.split(FIELD_DELIMITER)[0] == Action.GANADORES:
                 self._protocol.send_message(client_sock, f'{Action.GANADORES}|1|2')
@@ -155,7 +155,7 @@ class Server:
                     self.__handle_client_message(client_sock, msg, amount_of_bets)
             except Exception as e:
                 if not self._signal_received:
-                    logging.error(f'action: receive_message | result: fail | error: {str(e)}')
+                    logging.error(f'action: client_closed | result: success')
                     client_sock.close()
                 break
 

@@ -10,7 +10,6 @@ MESSAGE_DELIMITER = b'\n'
 MESSAGE_DELIMITER_STR = '\n'
 FIELD_DELIMITER = '|'
 BET_DELIMITER = ';'
-NUMBER_OF_AGENCIES = 5
 EMPTY_BYTE_SOCKET_CLOSED = b''
 
 class Action(str, Enum):
@@ -51,7 +50,7 @@ class Protocol:
         return b"".join((msg)).rstrip().decode('utf-8')
 
 class Server:
-    def __init__(self, port, listen_backlog):
+    def __init__(self, port, listen_backlog, client_amount):
         # Initialize server socket
         self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._server_socket.bind(('', port))
@@ -59,7 +58,7 @@ class Server:
         self._signal_received = False
         self._protocol = Protocol(field_delimiter='|', message_delimiter=b'\n')
         self._threads: list[(threading.Thread, socket.socket)] = []
-        self._barrier = threading.Barrier(NUMBER_OF_AGENCIES, timeout=5)
+        self._barrier = threading.Barrier(client_amount, timeout=5)
         self._lock = threading.Lock()
         signal.signal(signal.SIGTERM, self.__sigterm_handler)
 
@@ -91,7 +90,6 @@ class Server:
         communication with a client. After client with communucation
         finishes, servers starts to accept new connections again
         """
-
         while not self._signal_received:
             self.__accept_new_connection()
             
@@ -102,7 +100,7 @@ class Server:
         with self._lock:
             store_bets(bets)
     
-    def __handle_client_bet(self, client_sock, bet_parts: list[str]):
+    def __handle_client_bet(self, bet_parts: list[str]):
         bet = Bet(bet_parts[0], bet_parts[1], bet_parts[2], bet_parts[3], bet_parts[4], bet_parts[5])
         self.__save_client_bets([bet])
     
@@ -111,7 +109,7 @@ class Server:
         with self._lock:
             list_of_bets = load_bets()
             for bet in list_of_bets:
-                if bet.agency == int(agency) and has_won(bet):
+                if (bet.agency == int(agency)) and has_won(bet):
                     winners_documents.append(bet.document)
         return winners_documents
     
@@ -126,7 +124,7 @@ class Server:
             if msg.split(FIELD_DELIMITER)[0] == Action.APUESTA and not betting_ended:
                 amount_of_bets[0] += 1
                 msg_fields = msg.split(FIELD_DELIMITER)
-                self.__handle_client_bet(client_sock, msg_fields[1:])
+                self.__handle_client_bet(msg_fields[1:])
             elif msg.split(FIELD_DELIMITER)[0] == Action.FIN_APUESTA:
                 betting_ended = True
                 logging.info(f'action: apuesta_recibida | result: success | cantidad: {amount_of_bets[0]}')
@@ -134,7 +132,14 @@ class Server:
                 self._protocol.send_message(client_sock, f'{Action.CONFIRMAR_APUESTA}|1|2')
                 amount_of_bets[0] = 0
             elif msg.split(FIELD_DELIMITER)[0] == Action.GANADORES:
-                self._protocol.send_message(client_sock, f'{Action.GANADORES}|1|2')
+                try:
+                    remaining = self._barrier.wait()
+                    if remaining == 0:
+                        logging.info(f'action: sorteo | result: success')
+                    winners_documents = self.__get_winners(msg.split(FIELD_DELIMITER)[1])
+                    self._protocol.send_message(client_sock, f'{Action.GANADORES}|{FIELD_DELIMITER.join(winners_documents)}')
+                except:
+                    return
             else:
                 logging.info(f'UNHANDLED MESSAGE: {msg}, {msg.split(FIELD_DELIMITER)[0]}')
         

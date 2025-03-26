@@ -167,7 +167,7 @@ func (c *Client) sendAndReceiveMessage(msg string) error {
 	if msgParts[0] == GANADORES {
 		cantGanadores := 0
 		if len(msgParts[1]) > 0 {
-			cantGanadores = len(strings.Split(msgParts[1], FIELD_DELIMITER))
+			cantGanadores = len(msgParts) - 1
 		}
 		log.Infof("action: consulta_ganadores | result: success | cant_ganadores: %v",
 			cantGanadores,
@@ -196,6 +196,13 @@ func (c *Client) waitForWinners() {
 		}
 		if msgParts[0] == GANADORES {
 			receivedResult = true
+			cantGanadores := 0
+			if len(msgParts[1]) > 0 {
+				cantGanadores = len(msgParts) - 1
+			}
+			log.Infof("action: consulta_ganadores | result: success | cant_ganadores: %v",
+				cantGanadores,
+			)
 		}
 	}
 }
@@ -241,7 +248,12 @@ func (c *Client) makeBets(file io.Reader) error {
 		bets, err := c.getBets(fileScanner, &currPacketSize)
 		if err != nil {
 			if len(bets) == 0 {
-				return err
+				message := GANADORES + FIELD_DELIMITER + c.config.ID
+				err := c.sendAndReceiveMessage(fmt.Sprintf("%v%c", message, MESSAGE_DELIMITER))
+				if err != nil {
+					return err
+				}
+				break
 			} else {
 				lastBet = true
 			}
@@ -288,6 +300,7 @@ func (c *Client) StartClientLoop() {
 		return
 	}
 	log.Infof("action: end_bets | result: success | client_id: %v", c.config.ID)
+	time.Sleep(time.Duration(time.Duration.Seconds(10)))
 	c.conn.Close()
 	log.Infof("action: close_connection | result: success | client_id: %v", c.config.ID)
 }

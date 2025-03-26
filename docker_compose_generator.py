@@ -1,6 +1,6 @@
 import sys
 
-def generateServer(f):
+def generateServer(f, client_count):
     f.write("name: tp0\n")
     f.write("services:\n")
     f.write("  server:\n")
@@ -11,6 +11,7 @@ def generateServer(f):
     f.write("      - ./server/config.ini:/config.ini\n")
     f.write("    environment:\n")
     f.write("      - PYTHONUNBUFFERED=1\n")
+    f.write("      - CLIENT_AMOUNT="+ str(client_count) + "\n")
     f.write("    networks:\n")
     f.write("      - testing_net\n\n")
 
@@ -21,7 +22,7 @@ def generateClient(f, id):
     f.write("    entrypoint: /client\n")
     f.write("    volumes:\n")
     f.write("      - ./client/config.yaml:/config.yaml\n")
-    f.write("      - ./.data/agency-1.csv:/agency-1.csv\n")
+    f.write("      - ./.data/agency-" + str(id) + ".csv:/agency-" + str(id) + ".csv\n")
     f.write("    environment:\n")
     f.write("      - CLI_ID=" + str(id) + "\n")
     f.write("    networks:\n")
@@ -39,7 +40,7 @@ def generateNetwork(f):
 
 def generateDockerCompose(file_name, client_count):
     f = open(file_name, "w")
-    generateServer(f)
+    generateServer(f, client_count)
     for id in range(1, int(client_count) + 1):
         generateClient(f, id)
     generateNetwork(f)

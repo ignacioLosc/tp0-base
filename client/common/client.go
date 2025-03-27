@@ -1,6 +1,7 @@
 package common
 
 import (
+	"archive/zip"
 	"bufio"
 	"fmt"
 	"io"
@@ -36,6 +37,7 @@ type Bet struct {
 // ClientConfig Configuration used by the client
 type ClientConfig struct {
 	ID             string
+	ZIP            bool
 	ServerAddress  string
 	LoopAmount     int
 	LoopPeriod     time.Duration
@@ -284,25 +286,56 @@ func (c *Client) makeBets(file io.Reader) error {
 
 // StartClientLoop Send messages to the client until some time threshold is met
 func (c *Client) StartClientLoop() {
-	file, err := os.Open(fmt.Sprintf("agency-%v.csv", c.config.ID))
-	if err != nil {
-		log.Infof("action: open_dataset | result: fail %v", err.Error())
+	var file io.ReadCloser
+	var err error
+
+	if c.config.ZIP {
+		dataset, err := zip.OpenReader("dataset.zip")
+		if err != nil {
+			log.Infof("action: open_dataset | result: fail | error: %v", err)
+			return
+		}
+		defer dataset.Close()
+
+		for _, f := range dataset.File {
+			if strings.HasPrefix(f.Name, fmt.Sprintf("agency-%v", c.config.ID)) {
+				file, err = f.Open()
+				if err != nil {
+					log.Infof("action: open_agency_file | result: fail | error: %v", err)
+					return
+				}
+				break
+			}
+		}
+
+		if file == nil {
+			log.Infof("action: open_dataset | result: fail")
+			return
+		}
+	} else {
+		file, err = os.Open(fmt.Sprintf("agency-%v.csv", c.config.ID))
+		if err != nil {
+			log.Infof("action: open_agency_csv | result: fail | error: %v", err)
+			return
+		}
 	}
+	defer file.Close()
 
 	err = c.createClientSocket()
 	if err != nil {
 		log.Infof("action: close_connection | result: success | client_id: %v", c.config.ID)
 		return
 	}
+
 	err = c.makeBets(file)
 	if err != nil {
 		log.Infof("action: close_connection | result: success | client_id: %v", c.config.ID)
-		file.Close()
 		return
 	}
+
 	log.Infof("action: end_bets | result: success | client_id: %v", c.config.ID)
-	time.Sleep(time.Duration(time.Duration.Seconds(50)))
+	time.Sleep(50 * time.Second)
+
 	c.conn.Close()
-	file.Close()
 	log.Infof("action: close_connection | result: success | client_id: %v", c.config.ID)
 }

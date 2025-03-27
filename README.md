@@ -10,7 +10,7 @@ El servidor esta diseñado en Python segun el modelo base provisto por la catedr
 Si bien para la resolucion del trabajo se utilizo la api de threads provista por Python, es importante tener en cuenta las limitaciones del lenguaje en cuanto a la concurrencia con threads debido al mecanismo GIL (global interpreter lock). Para lograr paralelismo puro en Python es necesario utilizar procesos separados, dado que cada uno tendra su propio GIL.
 
 ## Cliente
-El servidor esta diseñado en Go segun el modelo base provisto por la catedra. Recibe por variables de entorno la ubicacion del dataset a utilizar para realizar las apuestas, el id utilizar para diferenciarse de los demas clientes y el tamaño maximo de apuestas a realizar en batch (siendo 8kb una cota superior para el tamaño del paquete sin importar el tamaño del batch provisto por config). Una vez que realiza todas las apuestas, espera por la realizacion del sorteo y recibe del servidor todos los ganadores que haya habido correspondientes a su agencia (dada por el id).
+El cliente esta diseñado en Go segun el modelo base provisto por la catedra. Recibe por variables de entorno la ubicacion del dataset a utilizar para realizar las apuestas, el id utilizar para diferenciarse de los demas clientes y el tamaño maximo de apuestas a realizar en batch (siendo 8kb una cota superior para el tamaño del paquete sin importar el tamaño del batch provisto por config). Una vez que realiza todas las apuestas, espera por la realizacion del sorteo y recibe del servidor todos los ganadores que haya habido correspondientes a su agencia (dada por el id).
 ## Protocolo
 Para la comunicacion entre el cliente y el servidor es necesario que ambos comprendan el formato de la informacion que deben comunicarse. Para ello se definen varios elementos que componen al protocolo:
 
@@ -74,6 +74,6 @@ with self._lock:
 Como podemos observar en estos ejemplos, siempre se adquiere el lock al momento de acceder a recursos compartidos
 
 ### Barrera
-La barrera es otra herramienta de sincronizacion que se utiliza para determinar el momento a realizar el sorteo, dado que es necesario que todas las cinco agencias hayan finalizado las apuestas para poder determinar ganadores. En consecuencia, las agencias que hayan terminado primero deberan esperar a las demas mediante una barrera, lo que permite ademas que la espera no sea con un mal uso de los recursos como busy-wait.
+La barrera es otra herramienta de sincronizacion que se utiliza para determinar el momento a realizar el sorteo, dado que es necesario que todas las cinco agencias (o las que se determinen por parametro en la funcion generadora del docker compose) hayan finalizado las apuestas para poder determinar ganadores. En consecuencia, las agencias que hayan terminado primero deberan esperar a las demas mediante una barrera, lo que permite ademas que la espera no sea con un mal uso de los recursos como busy-wait.
 ## Docker
 Como parte del trabajo, se utiliza docker para la creacion de containers que aislen al entorno de ejecucion de los procesos cliente servidor del resto del sistema. Se utiliza un archivo docker compose, asi como un script generador del mismo, volumenes para la persistencia de la configuracion y variables de entorno para por ejemplo indicar el nivel del logger.

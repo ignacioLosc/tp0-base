@@ -17,7 +17,9 @@ def generateServer(f):
 def generateClient(f, id):
     f.write("  client" + str(id) + ":\n")
     f.write("    container_name: client" + str(id) + "\n")
-    f.write("    image: client:latest\n")
+    f.write("    build:\n")
+    f.write("      dockerfile: ./client/Dockerfile.client" + str(id) + "\n")
+    f.write("      context: .\n")
     f.write("    entrypoint: /client\n")
     f.write("    volumes:\n")
     f.write("      - ./client/config"+str(id)+".yaml:/config.yaml\n")

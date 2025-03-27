@@ -300,7 +300,7 @@ func (c *Client) StartClientLoop() {
 		return
 	}
 	log.Infof("action: end_bets | result: success | client_id: %v", c.config.ID)
-	time.Sleep(time.Duration(time.Duration.Seconds(10)))
+	time.Sleep(time.Duration(time.Duration.Seconds(50)))
 	c.conn.Close()
 	log.Infof("action: close_connection | result: success | client_id: %v", c.config.ID)
 }
